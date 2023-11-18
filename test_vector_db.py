@@ -22,6 +22,9 @@ class TestChromaDB(unittest.TestCase):
             shutil.rmtree(cls.db_name)
     
     def test_add(cls):
+        cls.chroma_db.client.delete_collection(cls.collection_name)
+        cls.chroma_db.collection = cls.chroma_db.client.create_collection(cls.collection_name)
+
         # embedding & id
         embedding_1 = [1.1, 2.1, 3.9, 4.3]
         id_1 = 'id_1'
@@ -45,9 +48,7 @@ class TestChromaDB(unittest.TestCase):
         embedding_3 = embedding_3[:-1]
         cls.chroma_db.add_one(id_3, embedding_3, None)
 
-        return
-    
-    def test_query(cls):
+        # query test
         embedding_3 = [2.2, 2.1, 3.9, 4.3]
         data = cls.chroma_db.query(embedding_3, n_results=2)
         cls.assertEqual(['id_3', 'id_2'], data['ids'][0])
@@ -61,6 +62,64 @@ class TestChromaDB(unittest.TestCase):
         cls.assertEqual(['id_3', 'id_2', 'id_1'], data['ids'][0])
         return
     
+    def test_default_embedding(cls):
+        cls.chroma_db.client.delete_collection(cls.collection_name)
+        cls.chroma_db.collection = cls.chroma_db.client.create_collection(cls.collection_name)
+
+        # embedding & id
+        id_1 = 'id_1'
+        data_1 = id_1
+
+        # embedding, id & metadata
+        id_2 = 'id_2'
+        data_2 = id_2
+        metadata_2 = {'name': id_2}
+        cls.chroma_db.collection.add(
+            documents=[data_1, data_2],
+            ids=[id_1, id_2],
+            metadatas=[None, metadata_2]
+        )
+
+        # try to add them again, should succeed with printing warnings
+        cls.chroma_db.collection.add(
+            documents=[data_1, data_2],
+            ids=[id_1, id_2],
+            metadatas=[None, metadata_2]
+        )
+
+        # exception with different embedding length
+        embedding_3 = [2.2, 2.1, 3.9, 4.3, 5.1]
+        id_3 = 'id_3'
+        data_3 = id_3
+        with cls.assertRaises(Exception):
+            cls.chroma_db.collection.add(
+                documents=[data_3],
+                embeddings=[embedding_3],
+                ids=[id_3],
+                metadatas=[None]
+            )
+
+        # this time should succeed
+        cls.chroma_db.collection.add(
+            documents=[data_3],
+            ids=[id_3],
+            metadatas=[None]
+        )
+
+        # query test
+        embedding_3 = [1] * 384
+        data = cls.chroma_db.query(embedding_3, n_results=2)
+        cls.assertEqual(['id_3', 'id_2'], data['ids'][0])
+
+        embedding = [2] * 384
+        data = cls.chroma_db.query(embedding, n_results=3)
+        cls.assertEqual(['id_3', 'id_2', 'id_1'], data['ids'][0])
+
+        embedding = [100] * 384
+        data = cls.chroma_db.query(embedding, n_results=3)
+        cls.assertEqual(['id_3', 'id_2', 'id_1'], data['ids'][0])
+        return
+
     @unittest.skipUnless(os.getenv('STRESS_TEST') == '1', 'skip stress test')
     def test_stress(cls):
         cls.chroma_db.client.delete_collection(cls.collection_name)

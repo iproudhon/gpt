@@ -68,6 +68,42 @@ class GPT:
         
     def get_embedding(self, text):
         return self.get_embeddings([text])[0]
+
+    @classmethod
+    def text_to_chunks(cls, text, chunk_size=500, overlap_size=100):
+        if chunk_size < overlap_size or chunk_size < 10 or overlap_size < 0:
+            raise ValueError("chunk_size must be at least 10 and greater than overlap_size")
+
+        overfill_size = overlap_size > 0 and int(overlap_size / 2) or int(chunk_size / 2)
+        chunks = []
+        start = 0
+        while start < len(text):
+            # Find the end of the chunk
+            end = start + chunk_size
+            if end > len(text) or len(text) - end <= overlap_size:
+                end = len(text)
+            else:
+                # Make sure to end the chunk at a space, extending the chunk within overfill_size if necessary
+                next = end
+                while next < len(text) and next - end <= overfill_size and not text[next].isspace():
+                    next += 1
+                if text[next].isspace():
+                    end = next
+            chunk = text[start:end]
+            chunks.append((start, end, chunk))
+
+            if end >= len(text):
+                break
+
+            # Move the next start to the end minus the overlap size
+            # Make sure to start at a non-whitespace character, shriniking the chunk within overfill_size if necessary
+            start = end - overlap_size
+            next = max(start, 1)
+            while next < end - overfill_size and not (text[next-1].isspace() and not text[next].isspace()):
+                next += 1
+            if text[next-1].isspace() and not text[next].isspace():
+                start = next
+        return chunks
     
     # prepare [{ "role": "user", "content": "<file-name>\n\n<file-content>" }]
     # from source files under dir/*/*
