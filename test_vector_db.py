@@ -136,7 +136,7 @@ class TestChromaDB(unittest.TestCase):
         duration = end_time - start_time
         print(f"Adding {count} took {format(duration, '.2f')} seconds, {format(count / duration, '.2f')} items per second")
 
-        query_count = 1000
+        query_count = 10000
         start_time = time.time()
         for i in range(query_count):
             data = cls.chroma_db.query([i] * embedding_dimension, n_results=10)
